@@ -92,22 +92,26 @@ class Repo2DockerSpawner(DockerSpawner):
     # Default r2d images start jupyter notebook, not singleuser
     cmd = ['jupyterhub-singleuser']
 
-    repo = Unicode(
+    provider = Unicode(
         None,
         allow_none=True,
         config=True,
         help="""
-        Repository to pass to repo2docker.
+        URL to the repository provider.
+        e.g. 'https://github.com/'
 
         Should not be None
         """
     )
 
-    ref = Unicode(
-        'master',
+    user_name = Unicode(
+        None,
+        allow_none=True,
         config=True,
         help="""
-        Ref to pass to repo2docker.
+        Username registered with the provider.
+        
+        Should not be None
         """
     )
 
@@ -126,13 +130,13 @@ class Repo2DockerSpawner(DockerSpawner):
             return None
 
     async def start(self):
-        repo_domain = 'https://github.com/mistamun/'
+        self.provider = self.provider.rstrip('/')
         repo = self.user_options['repo']
-        resolved_ref = await resolve_ref(f'{repo_domain}{repo}', self.user_options['ref'])
-        repo_escaped = escape(f'{repo_domain}{repo}', escape_char='-').lower()
+        resolved_ref = await resolve_ref(f'{self.provider}/{self.user_name}/{repo}', self.user_options['ref'])
+        repo_escaped = escape(f'{self.provider}/{self.user_name}/{repo}', escape_char='-').lower()
         image_spec = f'r2dspawner-{repo_escaped}:{resolved_ref}'
         
-        self.log.debug(f'Repo: {repo_domain}{repo}')
+        self.log.debug(f'Repo: {self.provider}/{self.user_name}/{repo}')
         self.log.debug(f'Ref: {self.user_options["ref"]}')
         self.log.debug(f'Resolved ref: {resolved_ref}')
         self.log.debug(f'Repo escaped: {repo_escaped}')
@@ -142,10 +146,10 @@ class Repo2DockerSpawner(DockerSpawner):
         if not image_info:
             self.log.info(f'Image {image_spec} not present, building...')
             r2d = Repo2Docker()
-            r2d.repo = f'{repo_domain}{repo}'
+            r2d.repo = f'{self.provider}/{self.user_name}/{repo}'
             r2d.ref = resolved_ref
             r2d.user_id = 1000
-            r2d.user_name = 'cfd'
+            r2d.user_name = self.user_name
 
             r2d.output_image_spec = image_spec
             r2d.initialize()
